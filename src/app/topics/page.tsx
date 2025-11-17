@@ -223,7 +223,7 @@ export default function TopicsPage() {
         ) : (
           <div className="rounded-2xl bg-white/10 border border-white/10 p-6 text-center text-indigo-100">
             <p className="text-lg font-medium">AI-дан жауап әлі алынбады</p>
-            <p className="mt-2 text-sm text-indigo-100/80">Сұрақ енгізіп, "Сұрау" батырмасын басыңыз</p>
+            <p className="mt-2 text-sm text-indigo-100/80"> Сұрақ енгізіп, {'"'}Сұрау{'"'} батырмасын басыңыз </p>
           </div>
         )}
       </section>
