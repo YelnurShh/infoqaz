@@ -9,7 +9,21 @@ interface RequestBody {
   prompt?: string;
 }
 
-/** Google Translate API — Text Translation */
+async function safeJsonOrText(res: Response): Promise<{ json?: any; text?: string }> {
+  // Try to parse JSON, otherwise return raw text
+  try {
+    const json = await res.clone().json();
+    return { json };
+  } catch {
+    try {
+      const text = await res.clone().text();
+      return { text };
+    } catch {
+      return {};
+    }
+  }
+}
+
 async function translateText(
   text: string,
   target: string,
@@ -22,59 +36,64 @@ async function translateText(
 
   const url = `${GOOGLE_TRANSLATE_URL}?key=${encodeURIComponent(apiKey)}`;
 
-  const res = await fetch(url, {
+  const resp = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      q: text,
-      target,
-      source,
-      format: "text",
-    }),
+    body: JSON.stringify({ q: text, target, source, format: "text" }),
+  }).catch((err) => {
+    throw new Error("Network error calling Google Translate: " + String(err));
   });
 
-  if (!res.ok) {
-    const txt = await res.text();
-    throw new Error(`Translate API error (${res.status}): ${txt}`);
+  if (!resp.ok) {
+    const body = await safeJsonOrText(resp);
+    const txt = body.text ?? JSON.stringify(body.json) ?? "";
+    throw new Error(`Translate API error (${resp.status}): ${txt}`);
   }
 
-  const data = await res.json();
+  const body = await safeJsonOrText(resp);
   const translated =
-    data?.data?.translations?.[0]?.translatedText ?? "";
-  return translated;
+    (body.json?.data?.translations?.[0]?.translatedText as string | undefined) ??
+    (typeof body.text === "string" ? body.text : "");
+  return translated ?? "";
 }
 
-/** Main POST Handler */
 export async function POST(req: NextRequest) {
   try {
-    const body: RequestBody = await req.json();
-    const userKaz = body.prompt?.trim() ?? "";
+    const bodyRaw = await req.text().catch(() => "");
+    const parsed = (() => {
+      try {
+        return bodyRaw ? (JSON.parse(bodyRaw) as RequestBody) : {};
+      } catch {
+        return {};
+      }
+    })();
+
+    const userKaz = (parsed.prompt ?? "").trim();
 
     if (!userKaz) {
-      return NextResponse.json(
-        { error: "Prompt is required" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Prompt is required" }, { status: 400 });
     }
 
-    // 1) Қазақ -> Ағылшын
-    let userEn: string;
+    // 1) Қазақ -> ағылшын (robust)
+    let userEn = "";
     try {
       userEn = await translateText(userKaz, "en", "kk");
-    } catch (error) {
-      console.warn("Translate (kk->en) failed, retrying without source.");
-      userEn = await translateText(userKaz, "en");
+      if (!userEn) {
+        // fallback: try without source
+        userEn = await translateText(userKaz, "en");
+      }
+    } catch (tErr) {
+      console.warn("Translate (kk->en) failed — using original kazakh as prompt. Error:", tErr instanceof Error ? tErr.message : String(tErr));
+      // fallback: use original kazakh as prompt to Groq (better than nothing)
+      userEn = userKaz;
     }
 
-    // 2) Groq API запросы
+    // 2) Call Groq
     const groqKey = process.env.GROQ_API_KEY;
     const model = process.env.GROQ_MODEL ?? "llama-3.1";
 
     if (!groqKey) {
-      return NextResponse.json(
-        { error: "Missing GROQ_API_KEY" },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: "Missing GROQ_API_KEY" }, { status: 500 });
     }
 
     const systemMessage = {
@@ -83,10 +102,7 @@ export async function POST(req: NextRequest) {
         "You are a concise, accurate computer science teacher. Answer in clear English with simple structure. Provide examples when helpful.",
     };
 
-    const userMessage = {
-      role: "user",
-      content: userEn,
-    };
+    const userMessage = { role: "user", content: userEn };
 
     const groqResp = await fetch(GROQ_URL, {
       method: "POST",
@@ -100,48 +116,50 @@ export async function POST(req: NextRequest) {
         temperature: 0.2,
         max_tokens: 900,
       }),
+    }).catch((err) => {
+      throw new Error("Network error when calling Groq: " + String(err));
     });
 
     if (!groqResp.ok) {
-      const errorText = await groqResp.text();
+      const body = await safeJsonOrText(groqResp);
+      const txt = body.text ?? JSON.stringify(body.json) ?? "";
       return NextResponse.json(
-        {
-          error: "Groq API error",
-          status: groqResp.status,
-          body: errorText,
-        },
+        { error: "Groq API error", status: groqResp.status, body: txt },
         { status: 502 }
       );
     }
 
-    const groqData = await groqResp.json();
-    const answerEn: string =
-      groqData?.choices?.[0]?.message?.content ??
-      groqData?.choices?.[0]?.text ??
+    const groqBody = await safeJsonOrText(groqResp);
+    const answerEn =
+      (groqBody.json?.choices?.[0]?.message?.content as string | undefined) ??
+      (groqBody.json?.choices?.[0]?.text as string | undefined) ??
+      (typeof groqBody.text === "string" ? groqBody.text : "") ??
       "";
 
-    // 3) Ағылшын -> Қазақ
-    let answerKz = "";
-    try {
-      answerKz = await translateText(answerEn, "kk", "en");
-    } catch (error) {
-      console.warn("Translate (en->kk) failed. Returning EN version only.");
-      answerKz = "";
+    // 3) Translate answer back to Kazakh only if answerEn exists
+    let answerKz: string | null = null;
+    if (answerEn) {
+      try {
+        answerKz = await translateText(answerEn, "kk", "en");
+      } catch (tErr) {
+        console.warn("Translate (en->kk) failed; returning English only. Error:", tErr instanceof Error ? tErr.message : String(tErr));
+        answerKz = null;
+      }
+    } else {
+      console.warn("Groq returned empty answerEn. Returning empty answer_kz.");
+      answerKz = null;
     }
 
-    // 4) Return JSON
     return NextResponse.json({
       ok: true,
       prompt_kz: userKaz,
       prompt_en: userEn,
-      answer_en: answerEn,
-      answer_kz: answerKz || null,
+      answer_en: answerEn || null,
+      answer_kz: answerKz,
     });
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Unknown server error";
+    const message = error instanceof Error ? error.message : String(error);
     console.error("API error:", message);
-
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
