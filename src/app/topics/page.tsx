@@ -22,42 +22,72 @@ export default function TopicsPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!query.trim()) return;
+// (TopicsPage ішінде ғана handleSearch функциясының толық нұсқасы)
+const handleSearch = async (e: React.FormEvent) => {
+  e.preventDefault();
+  if (!query.trim()) return;
 
-    setLoading(true);
-    setError(null);
-    setResult(null);
+  setLoading(true);
+  setError(null);
+  setResult(null);
 
-    try {
-      const res = await fetch("/api/groq", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: query }),
-      });
+  try {
+    const res = await fetch("/api/groq", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt: query }),
+    });
 
-      const data = (await res.json()) as {
-        error?: string;
-        answer_kz?: string | null;
-        answer_en?: string | null;
-      };
+    // Лог: статус (dev үшін пайдалы)
+    console.log("API status:", res.status, res.statusText);
 
-      if (!res.ok || data?.error) {
-        setError(data?.error ?? "Серверде қате пайда болды");
-      } else {
-        setResult({
-          kz: data.answer_kz ?? undefined,
-          en: data.answer_en ?? undefined,
-        });
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Белгісіз қате";
-      setError(message);
-    } finally {
-      setLoading(false);
+    // raw текст ретінде аламыз (json парсинг қателерін болдырмау үшін)
+    const raw = await res.text();
+
+    if (!raw) {
+      setError(`Бос жауап алынды (status ${res.status})`);
+      return;
     }
-  };
+
+    // Қауіпсіз JSON парсинг
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw);
+    } catch (_err) {
+      const snippet = raw.length > 300 ? raw.slice(0, 300) + "…" : raw;
+      setError(`Жауап JSON емес: ${snippet}`);
+      return;
+    }
+
+    // parsed объект пе екенін тексереміз
+    if (!parsed || typeof parsed !== "object") {
+      setError(`Серверден күтілмеген жауап келді.`);
+      return;
+    }
+
+    // Қазір TypeScript үшін parsed-ты нақты типке түрлендіреміз
+    const obj = parsed as {
+      error?: string;
+      answer_kz?: string | null;
+      answer_en?: string | null;
+    };
+
+    if (!res.ok || obj.error) {
+      setError(obj.error ?? `Сервер қатесі (status ${res.status})`);
+      return;
+    }
+
+    setResult({
+      kz: obj.answer_kz ?? undefined,
+      en: obj.answer_en ?? undefined,
+    });
+  } catch (fetchErr) {
+    const message = fetchErr instanceof Error ? fetchErr.message : String(fetchErr);
+    setError(`Fetch қатесі: ${message}`);
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-indigo-600 to-blue-500 text-white px-4 py-8 md:px-8">
