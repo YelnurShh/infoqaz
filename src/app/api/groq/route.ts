@@ -9,8 +9,10 @@ interface RequestBody {
   prompt?: string;
 }
 
-async function safeJsonOrText(res: Response): Promise<{ json?: any; text?: string }> {
-  // Try to parse JSON, otherwise return raw text
+/** Try parse JSON, otherwise return raw text. No 'any' used. */
+async function safeJsonOrText(
+  res: Response
+): Promise<{ json?: unknown; text?: string }> {
   try {
     const json = await res.clone().json();
     return { json };
@@ -22,6 +24,23 @@ async function safeJsonOrText(res: Response): Promise<{ json?: any; text?: strin
       return {};
     }
   }
+}
+
+/** Safely traverse nested unknown object and return string if present */
+function getNestedString(root: unknown, path: (string | number)[]): string | undefined {
+  let cur: unknown = root;
+  for (const key of path) {
+    if (typeof key === "number") {
+      if (!Array.isArray(cur)) return undefined;
+      cur = cur[key];
+    } else {
+      if (cur === null || typeof cur !== "object") return undefined;
+      const obj = cur as Record<string, unknown>;
+      if (!(key in obj)) return undefined;
+      cur = obj[key];
+    }
+  }
+  return typeof cur === "string" ? cur : undefined;
 }
 
 async function translateText(
@@ -46,13 +65,13 @@ async function translateText(
 
   if (!resp.ok) {
     const body = await safeJsonOrText(resp);
-    const txt = body.text ?? JSON.stringify(body.json) ?? "";
+    const txt = body.text ?? (body.json ? JSON.stringify(body.json) : "");
     throw new Error(`Translate API error (${resp.status}): ${txt}`);
   }
 
   const body = await safeJsonOrText(resp);
-  const translated =
-    (body.json?.data?.translations?.[0]?.translatedText as string | undefined) ??
+  // Try to read translations[0].translatedText
+  const translated = getNestedString(body.json, ["data", "translations", 0, "translatedText"]) ??
     (typeof body.text === "string" ? body.text : "");
   return translated ?? "";
 }
@@ -83,8 +102,11 @@ export async function POST(req: NextRequest) {
         userEn = await translateText(userKaz, "en");
       }
     } catch (tErr) {
-      console.warn("Translate (kk->en) failed — using original kazakh as prompt. Error:", tErr instanceof Error ? tErr.message : String(tErr));
-      // fallback: use original kazakh as prompt to Groq (better than nothing)
+      console.warn(
+        "Translate (kk->en) failed — using original kazakh as prompt. Error:",
+        tErr instanceof Error ? tErr.message : String(tErr)
+      );
+      // fallback: use original kazakh as prompt to Groq
       userEn = userKaz;
     }
 
@@ -122,7 +144,7 @@ export async function POST(req: NextRequest) {
 
     if (!groqResp.ok) {
       const body = await safeJsonOrText(groqResp);
-      const txt = body.text ?? JSON.stringify(body.json) ?? "";
+      const txt = body.text ?? (body.json ? JSON.stringify(body.json) : "");
       return NextResponse.json(
         { error: "Groq API error", status: groqResp.status, body: txt },
         { status: 502 }
@@ -131,8 +153,8 @@ export async function POST(req: NextRequest) {
 
     const groqBody = await safeJsonOrText(groqResp);
     const answerEn =
-      (groqBody.json?.choices?.[0]?.message?.content as string | undefined) ??
-      (groqBody.json?.choices?.[0]?.text as string | undefined) ??
+      getNestedString(groqBody.json, ["choices", 0, "message", "content"]) ??
+      getNestedString(groqBody.json, ["choices", 0, "text"]) ??
       (typeof groqBody.text === "string" ? groqBody.text : "") ??
       "";
 
@@ -142,7 +164,10 @@ export async function POST(req: NextRequest) {
       try {
         answerKz = await translateText(answerEn, "kk", "en");
       } catch (tErr) {
-        console.warn("Translate (en->kk) failed; returning English only. Error:", tErr instanceof Error ? tErr.message : String(tErr));
+        console.warn(
+          "Translate (en->kk) failed; returning English only. Error:",
+          tErr instanceof Error ? tErr.message : String(tErr)
+        );
         answerKz = null;
       }
     } else {
