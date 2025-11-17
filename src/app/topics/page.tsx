@@ -37,18 +37,23 @@ export default function TopicsPage() {
         body: JSON.stringify({ prompt: query }),
       });
 
-      const data = await res.json();
+      const data = (await res.json()) as {
+        error?: string;
+        answer_kz?: string | null;
+        answer_en?: string | null;
+      };
 
       if (!res.ok || data?.error) {
-        setError(data?.error || "Серверде қате пайда болды");
+        setError(data?.error ?? "Серверде қате пайда болды");
       } else {
         setResult({
-          kz: data.answer_kz,
-          en: data.answer_en,
+          kz: data.answer_kz ?? undefined,
+          en: data.answer_en ?? undefined,
         });
       }
-    } catch (err: any) {
-      setError(err.message ?? "Белгісіз қате");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Белгісіз қате";
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -83,13 +88,13 @@ export default function TopicsPage() {
           placeholder="Информатика бойынша кез келген сұрақты жазыңыз..."
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          className="flex-1 p-3 rounded-lg text-white border-2 border-white
-                     placeholder-white caret-white bg-transparent text-sm md:text-base"
+          className="flex-1 p-3 rounded-lg text-white border-2 border-white placeholder-white caret-white bg-transparent text-sm md:text-base"
         />
 
         <button
           type="submit"
-          className="flex items-center justify-center gap-2 px-4 py-2 bg-white text-indigo-700 font-bold rounded-lg shadow hover:bg-indigo-100 transition text-sm md:text-base"
+          disabled={loading}
+          className="flex items-center justify-center gap-2 px-4 py-2 bg-white text-indigo-700 font-bold rounded-lg shadow hover:bg-indigo-100 transition text-sm md:text-base disabled:opacity-50"
         >
           {loading ? "Жауап күтіліп жатыр..." : "🔍 Сұрау"}
         </button>
