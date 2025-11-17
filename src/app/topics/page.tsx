@@ -2,17 +2,12 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import Image from "next/image";
 
-// ✅ Wikipedia API нәтижесінің типі
-type WikiResult = {
-  title: string;
-  extract: string;
-  thumbnail?: { source: string };
-  content_urls?: { desktop?: { page?: string } };
+type AIResult = {
+  kz?: string; // қазақша жауап
+  en?: string; // ағылшынша жауап (debug)
 };
 
-// 🧠 Информатика тақырыптары
 const topics = [
   { id: "computer-history", title: "Компьютердің даму тарихы" },
   { id: "internet", title: "Интернеттің пайда болуы" },
@@ -23,31 +18,49 @@ const topics = [
 
 export default function TopicsPage() {
   const [query, setQuery] = useState("");
-  const [result, setResult] = useState<WikiResult | null>(null);
+  const [result, setResult] = useState<AIResult | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!query) return;
+    if (!query.trim()) return;
+
+    setLoading(true);
+    setError(null);
+    setResult(null);
 
     try {
-      const res = await fetch(
-        `https://kk.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(query)}`
-      );
+      const res = await fetch("/api/groq", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: query }),
+      });
+
       const data = await res.json();
-      setResult(data);
-    } catch {
-      setResult({ title: "Қате", extract: "Ақпарат табылмады." });
+
+      if (!res.ok || data?.error) {
+        setError(data?.error || "Серверде қате пайда болды");
+      } else {
+        setResult({
+          kz: data.answer_kz,
+          en: data.answer_en,
+        });
+      }
+    } catch (err: any) {
+      setError(err.message ?? "Белгісіз қате");
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-indigo-600 to-blue-500 text-white px-4 py-8 md:px-8">
-      {/* 🟦 Тақырып */}
       <h1 className="text-2xl md:text-4xl font-bold text-center mb-6">
         Информатика тақырыптары 💻
       </h1>
 
-      {/* 📚 Статикалық тақырыптар */}
+      {/* Тақырып блоктары */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-3xl mx-auto mb-8">
         {topics.map((topic) => (
           <Link
@@ -60,53 +73,50 @@ export default function TopicsPage() {
         ))}
       </div>
 
-      {/* 🔍 Wikipedia іздеу жолағы */}
+      {/* Іздеу формасы */}
       <form
         onSubmit={handleSearch}
         className="max-w-3xl mx-auto mb-6 flex flex-col sm:flex-row gap-3"
       >
         <input
           type="text"
-          placeholder="Информатика бойынша кез келген тақырыпты іздеңіз..."
+          placeholder="Информатика бойынша кез келген сұрақты жазыңыз..."
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          className="flex-1 p-3 rounded-lg text-white border-2 border-white placeholder-white caret-white bg-transparent text-sm md:text-base"
+          className="flex-1 p-3 rounded-lg text-white border-2 border-white
+                     placeholder-white caret-white bg-transparent text-sm md:text-base"
         />
 
         <button
           type="submit"
           className="flex items-center justify-center gap-2 px-4 py-2 bg-white text-indigo-700 font-bold rounded-lg shadow hover:bg-indigo-100 transition text-sm md:text-base"
         >
-          🔍 Іздеу
+          {loading ? "Жауап күтіліп жатыр..." : "🔍 Сұрау"}
         </button>
       </form>
 
-      {/* 📄 Іздеу нәтижесі */}
+      {/* Қате */}
+      {error && (
+        <div className="max-w-3xl mx-auto bg-red-100 text-red-900 p-4 rounded mb-4">
+          Қате: {error}
+        </div>
+      )}
+
+      {/* Нәтиже */}
       {result && (
         <div className="max-w-3xl mx-auto bg-white text-black p-4 md:p-6 rounded-lg shadow">
-          {result.thumbnail && (
-            <div className="relative w-full h-48 md:h-64 mb-4">
-              <Image
-                src={result.thumbnail.source}
-                alt={result.title}
-                fill
-                className="object-cover rounded"
-              />
-            </div>
-          )}
-          <h2 className="text-lg md:text-2xl font-bold mb-2">{result.title}</h2>
-          <p className="text-sm md:text-base mb-3 leading-relaxed">
-            {result.extract}
-          </p>
-          {result.content_urls?.desktop?.page && (
-            <a
-              href={result.content_urls.desktop.page}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-blue-600 underline text-sm md:text-base"
-            >
-              Wikipedia бетіне өту
-            </a>
+          <h3 className="font-bold mb-2 text-lg">Жауап:</h3>
+
+          <pre className="whitespace-pre-wrap text-sm md:text-base leading-relaxed">
+            {result.kz}
+          </pre>
+
+          {/* Debug — ағылшынша нұсқа */}
+          {result.en && (
+            <details className="mt-4 text-gray-700">
+              <summary className="cursor-pointer">Ағылшынша</summary>
+              <pre className="whitespace-pre-wrap text-xs mt-2">{result.en}</pre>
+            </details>
           )}
         </div>
       )}

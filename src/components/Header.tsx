@@ -2,13 +2,15 @@
 
 import Link from "next/link";
 import { useState, useEffect } from "react";
-import { onAuthStateChanged, User } from "firebase/auth";
+import { onAuthStateChanged, User, signOut  } from "firebase/auth";
 import { auth } from "@/lib/firebase";
+import { useRouter } from "next/navigation";
 
 export default function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const router = useRouter();
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -17,6 +19,11 @@ export default function Header() {
     });
     return () => unsubscribe();
   }, []);
+
+   const handleLogout = async () => {
+      await signOut(auth);
+      router.push("/auth/sign_in");
+    };
 
   return (
     <header className="w-full bg-gradient-to-br from-indigo-600 to-blue-500 text-white py-4 shadow-md">
