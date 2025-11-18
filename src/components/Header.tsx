@@ -27,7 +27,8 @@ export default function Header() {
 
   return (
     <header className="w-full bg-gradient-to-br from-indigo-600 to-blue-500 text-white py-4 shadow-md">
-      <div className="relative max-w-6xl mx-auto flex justify-between items-center px-6">
+      {/* PC layout */}
+      <div className="relative max-w-6xl mx-auto hidden md:flex justify-between items-center px-6">
 
         {/* Сол жақ — Logo */}
         <h1>
@@ -39,10 +40,11 @@ export default function Header() {
           </Link>
         </h1>
 
-        {/* 🔥 ОРТАДА ТҰРАТЫН МАТИН */}
-        <div className="absolute left-1/2 transform -translate-x-1/2 text-center hidden md:block">
-          <p className="text-sm font-medium opacity-90">
-            Информатика пәнінің мұғалімі: <br />
+        {/* 🔥 ОРТАДА ТҰРАТЫН МӘТІН (ПК-де) */}
+        <div className="absolute left-1/2 transform -translate-x-1/2 text-center">
+          <p className="text-sm font-medium opacity-90 leading-tight">
+            Информатика пәнінің мұғалімі:
+            <br />
             <span className="font-semibold">Шахарова Гүлпайна Өтегенқызы</span>
           </p>
         </div>
@@ -64,21 +66,43 @@ export default function Header() {
             </Link>
           )}
         </nav>
+      </div>
+
+      {/* 📱 МОБИЛЬ НҰСҚА */}
+      <div className="md:hidden px-6 flex flex-col items-center text-center">
+        {/* ЛОГО */}
+        <Link
+          href="/"
+          className="text-xl font-bold hover:underline mb-1"
+        >
+          ⚡︎ InfoQaz
+        </Link>
+
+        {/* 🔥 Мұғалімнің аты (мобильде де көрінеді) */}
+        <p className="text-xs font-medium opacity-90 leading-tight mb-2">
+          Информатика пәнінің мұғалімі:
+          <br />
+          <span className="font-semibold">Шахарова Гүлпайна Өтегенқызы</span>
+        </p>
 
         {/* Мобиль мәзір батырмасы */}
         <button
-          className="md:hidden flex items-center justify-center p-2 rounded hover:bg-blue-700 transition text-lg"
+          className="flex items-center justify-center p-2 rounded hover:bg-blue-700 transition text-lg"
           onClick={() => setMenuOpen(!menuOpen)}
         >
           {menuOpen ? "✖️" : "☰"}
         </button>
       </div>
 
-      {/* Мобиль мәзір */}
+      {/* 📱 Мобиль мәзір */}
       {menuOpen && (
         <nav className="md:hidden flex flex-col items-center bg-blue-700 py-4 space-y-3 text-base">
-          <Link href="/" onClick={() => setMenuOpen(false)}>Басты бет</Link>
-          <Link href="/topics" onClick={() => setMenuOpen(false)}>Тақырыптар</Link>
+          <Link href="/" onClick={() => setMenuOpen(false)}>
+            Басты бет
+          </Link>
+          <Link href="/topics" onClick={() => setMenuOpen(false)}>
+            Тақырыптар
+          </Link>
 
           {!loading && !user && (
             <Link href="/auth/sign_in" onClick={() => setMenuOpen(false)}>
