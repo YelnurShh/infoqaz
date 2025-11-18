@@ -21,14 +21,17 @@ export default async function TopicDetailPage({
       <div className="max-w-3xl mx-auto">
         <h1 className="text-3xl font-bold mb-4 text-blue-800">{topic.title}</h1>
         <p className="mb-6 text-lg text-gray-700">{topic.description}</p>
-        <iframe
-  width="100%"
-  height="400"
-  src={topic.video ?? undefined}
-  title={topic.title}
-  className="w-full rounded-xl shadow-lg mb-8"
-  allowFullScreen
-/>
+        {topic.video ? (
+  <iframe
+    width="100%"
+    height="400"
+    src={topic.video}
+    title={topic.title}
+    className="w-full rounded-xl shadow-lg mb-8"
+    allowFullScreen
+  />
+) : null}
+
 
         <Quiz questions={topic.questions} topicId={id} />
       </div>
