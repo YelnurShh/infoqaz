@@ -18,19 +18,15 @@ const topics = [
   // ЖАҢА тақырыптар:
   { id: "info-our-world", title: "Біздің айналамыздағы ақпарат" },
   { id: "info-giving", title: "Ақпарат беру" },
-  { id: "info-giving-practice", title: "Ақпаратты беру — Практикум" },
-  { id: "info-encryption", title: "Ақпаратты шифрлау" },
-  { id: "info-encryption-practice", title: "Ақпаратты шифрлау — Практикум" },
-  { id: "binary-representation", title: "Екілік ақпаратты ұсыну" },
-  { id: "graphic-binary-practice", title: "Графикалық ақпаратты екілік кодта — Практикум" },
-  { id: "creative-practice", title: "Шығармашылық-практикалық тапсырмалар" },
 
-  { id: "raster-processing", title: "Растрлық суреттерді өңдеу — Практикум" },
+  { id: "info-encryption", title: "Ақпаратты шифрлау" },
+
+  { id: "binary-representation", title: "Екілік ақпаратты ұсыну" },
   { id: "vector-creation", title: "Векторлық суреттерді құру" },
-  { id: "vector-creation-practice", title: "Векторлық суреттерді құру — Практикум" },
+
   { id: "page-layout", title: "Қисық бетімен жұмыс" },
-  { id: "raster-vector-compare", title: "Растрлық және векторлық суреттерді салыстыру" },
-  { id: "raster-vector-compare-practice", title: "Растрлық және векторлық графиканы салыстыру — Практикум" },
+
+
 ];
 
 export default function TopicsPage() {
