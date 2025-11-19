@@ -7,13 +7,12 @@ export function generateStaticParams() {
   return Object.keys(topicsData).map((id) => ({ id } as { id: keyof typeof topicsData }));
 }
 
-// ⚠️ Бетті async қыламыз және params-ты await етеміз
+// Next.js талап еткендей — params-ты await етеміз
 export default async function TopicDetailPage({
   params,
 }: {
   params: Promise<{ id: keyof typeof topicsData }>;
 }) {
-  // Important: await params before using
   const { id } = await params;
   const topic = topicsData[id];
 
@@ -21,7 +20,6 @@ export default async function TopicDetailPage({
     return <p className="text-center p-10">Тақырып табылмады 😢</p>;
   }
 
-  // Егер topic.video бос/undefined/null болса, iframe шығармаймыз
   const videoSrc: string | undefined =
     typeof topic.video === "string" && topic.video.trim() !== "" ? topic.video : undefined;
 
