@@ -1,3 +1,4 @@
+// src/app/topics/page.tsx
 "use client";
 
 import Link from "next/link";
@@ -38,7 +39,6 @@ const topics = [
 /** Type guard: API жауап объектісі WikiApiResponse тәрізді ме */
 function isWikiApiResponse(obj: unknown): obj is WikiApiResponse {
   if (!obj || typeof obj !== "object") return false;
-  // ең аз талап — title өрісі бар және string болуы керек
   const o = obj as Record<string, unknown>;
   return typeof o.title === "string";
 }
@@ -78,6 +78,7 @@ export default function TopicsPage() {
         `https://kk.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(q)}`
       );
 
+      // HTTP қателерін тексеру
       if (!res.ok) {
         if (res.status === 404) {
           setError("Мақала табылмады (404). Басқа сөзбен іздеп көріңіз.");
@@ -104,7 +105,7 @@ export default function TopicsPage() {
         setResult({
           title: api.title as string,
           extract: (typeof api.extract === "string" ? api.extract : null),
-          thumbnail: thumb ? thumb : null,
+          thumbnail: thumb ? (thumb as any) : null,
           content_urls: (typeof api.content_urls === "object" && api.content_urls !== null)
             ? (api.content_urls as { desktop?: { page?: string } })
             : undefined,
@@ -113,7 +114,6 @@ export default function TopicsPage() {
         setError("Мәлімет табылмады.");
       }
     } catch (err: unknown) {
-      // err-ті string-ке қауіпсіз түрлендіру
       const message =
         err && typeof err === "object" && "message" in err && typeof (err as any).message === "string"
           ? (err as any).message

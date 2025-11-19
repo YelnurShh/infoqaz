@@ -4,23 +4,24 @@ import Quiz from "@/components/Quiz";
 import React from "react";
 
 export function generateStaticParams() {
-  // Return list of ids for SSG
   return Object.keys(topicsData).map((id) => ({ id } as { id: keyof typeof topicsData }));
 }
 
-export default function TopicDetailPage({
+// ⚠️ Бетті async қыламыз және params-ты await етеміз
+export default async function TopicDetailPage({
   params,
 }: {
-  params: { id: keyof typeof topicsData };
+  params: Promise<{ id: keyof typeof topicsData }>;
 }) {
-  const { id } = params;
+  // Important: await params before using
+  const { id } = await params;
   const topic = topicsData[id];
 
   if (!topic) {
     return <p className="text-center p-10">Тақырып табылмады 😢</p>;
   }
 
-  // Қауіпсіз түрде videoSrc анықтаймыз: тек қана нақты string болса береміз
+  // Егер topic.video бос/undefined/null болса, iframe шығармаймыз
   const videoSrc: string | undefined =
     typeof topic.video === "string" && topic.video.trim() !== "" ? topic.video : undefined;
 
@@ -30,7 +31,6 @@ export default function TopicDetailPage({
         <h1 className="text-3xl font-bold mb-4 text-blue-800">{topic.title}</h1>
         <p className="mb-6 text-lg text-gray-700">{topic.description}</p>
 
-        {/* iframe-ды тек videoSrc бар кезде ғана көрсетеміз */}
         {videoSrc ? (
           <iframe
             width="100%"
