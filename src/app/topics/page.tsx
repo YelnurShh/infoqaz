@@ -256,44 +256,7 @@ export default function TopicsPage() {
         </div>
       </section>
 
-      {/* AI search form (original) */}
-      <section className="max-w-5xl mx-auto mb-8 bg-white/5 p-6 rounded-2xl shadow-lg">
-        <form onSubmit={handleSearch} className="flex flex-col gap-4">
-          <label className="font-medium">AI арқылы сұрау жіберу</label>
-          <div className="flex gap-3">
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Сұрағыңызды жазыңыз... (мысалы: 'Екілік жүйе деген не?')"
-              className="flex-1 rounded-md px-4 py-3 text-indigo-900 bg-white/95 placeholder:text-indigo-500/60 shadow-inner"
-            />
-            <button type="submit" className="px-4 py-2 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white font-medium">
-              Жіберу
-            </button>
-          </div>
-
-          {loading && <div>AI жауап жүктелуде...</div>}
-          {error && <div className="text-red-300">{error}</div>}
-
-          {result && (
-            <div className="mt-2 bg-white/90 text-indigo-900 p-4 rounded-md shadow-sm">
-              {result.kz && (
-                <div>
-                  <h4 className="font-semibold">Қазақша жауап</h4>
-                  <p className="mt-1">{result.kz}</p>
-                </div>
-              )}
-
-              {result.en && (
-                <div className="mt-3">
-                  <h4 className="font-semibold">English (debug)</h4>
-                  <pre className="mt-1 whitespace-pre-wrap text-sm">{result.en}</pre>
-                </div>
-              )}
-            </div>
-          )}
-        </form>
-      </section>
+      
 
       <footer className="max-w-5xl mx-auto text-center text-indigo-100/70">
         <small>© {new Date().getFullYear()} InfoQaz — оқушыларға арналған білім материалы</small>
