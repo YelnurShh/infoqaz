@@ -8,6 +8,18 @@ type AIResult = {
   en?: string; // ағылшынша жауап (debug)
 };
 
+type WikiSearchItem = {
+  title: string;
+  snippet: string;
+  pageid: number;
+};
+
+type WikiApiResponse = {
+  query?: {
+    search?: WikiSearchItem[];
+  };
+};
+
 const topics = [
   { id: "computer-history", title: "Компьютердің даму тарихы" },
   { id: "internet", title: "Интернеттің пайда болуы" },
@@ -35,7 +47,7 @@ export default function TopicsPage() {
   const [wikiQuery, setWikiQuery] = useState("");
   const [wikiLoading, setWikiLoading] = useState(false);
   const [wikiError, setWikiError] = useState<string | null>(null);
-  const [wikiResults, setWikiResults] = useState<Array<{ title: string; snippet: string; pageid: number }>>([]);
+  const [wikiResults, setWikiResults] = useState<WikiSearchItem[]>([]);
   const [wikiLang, setWikiLang] = useState<"kk" | "en">("kk");
 
   const wikiDebounceRef = useRef<number | null>(null);
@@ -126,10 +138,15 @@ export default function TopicsPage() {
 
       const res = await fetch(endpoint);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
+      const data = (await res.json()) as WikiApiResponse;
 
       const search = data?.query?.search ?? [];
-      const mapped = search.map((item: any) => ({ title: item.title, snippet: item.snippet, pageid: item.pageid }));
+      // search already typed as WikiSearchItem[]
+      const mapped: WikiSearchItem[] = search.map((item) => ({
+        title: item.title,
+        snippet: item.snippet,
+        pageid: item.pageid,
+      }));
       setWikiResults(mapped);
     } catch (err) {
       setWikiError(err instanceof Error ? err.message : String(err));
