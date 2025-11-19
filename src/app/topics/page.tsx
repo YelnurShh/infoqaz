@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type AIResult = {
   kz?: string; // қазақша жауап
@@ -30,6 +30,15 @@ export default function TopicsPage() {
   const [result, setResult] = useState<AIResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Wikipedia search state
+  const [wikiQuery, setWikiQuery] = useState("");
+  const [wikiLoading, setWikiLoading] = useState(false);
+  const [wikiError, setWikiError] = useState<string | null>(null);
+  const [wikiResults, setWikiResults] = useState<Array<{ title: string; snippet: string; pageid: number }>>([]);
+  const [wikiLang, setWikiLang] = useState<"kk" | "en">("kk");
+
+  const wikiDebounceRef = useRef<number | null>(null);
 
   // (TopicsPage ішінде ғана handleSearch функциясының толық нұсқасы)
   const handleSearch = async (e: React.FormEvent) => {
@@ -98,6 +107,50 @@ export default function TopicsPage() {
     }
   };
 
+  // Wikipedia search function (uses MediaWiki API with origin=* to avoid CORS issues)
+  const performWikiSearch = async (q: string, lang: string) => {
+    if (!q.trim()) {
+      setWikiResults([]);
+      setWikiError(null);
+      return;
+    }
+
+    setWikiLoading(true);
+    setWikiError(null);
+
+    try {
+      // using "query" + "search" to get snippets
+      const endpoint = `https://${lang}.wikipedia.org/w/api.php?action=query&format=json&list=search&utf8=1&srsearch=${encodeURIComponent(
+        q,
+      )}&srlimit=8&origin=*`;
+
+      const res = await fetch(endpoint);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+
+      const search = data?.query?.search ?? [];
+      const mapped = search.map((item: any) => ({ title: item.title, snippet: item.snippet, pageid: item.pageid }));
+      setWikiResults(mapped);
+    } catch (err) {
+      setWikiError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setWikiLoading(false);
+    }
+  };
+
+  // debounce wikiQuery
+  useEffect(() => {
+    if (wikiDebounceRef.current) window.clearTimeout(wikiDebounceRef.current);
+    wikiDebounceRef.current = window.setTimeout(() => {
+      performWikiSearch(wikiQuery, wikiLang);
+    }, 400);
+
+    return () => {
+      if (wikiDebounceRef.current) window.clearTimeout(wikiDebounceRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wikiQuery, wikiLang]);
+
   return (
     <main className="min-h-screen bg-gradient-to-br from-indigo-600 to-blue-500 text-white px-4 py-12 md:px-12 lg:px-24">
       <header className="max-w-5xl mx-auto mb-8">
@@ -133,91 +186,96 @@ export default function TopicsPage() {
         </div>
       </section>
 
-      {/* Іздеу формасы */}
-      <section className="max-w-3xl mx-auto mb-8">
-        <form onSubmit={handleSearch} className="flex flex-col sm:flex-row gap-3 items-center">
-          <label htmlFor="topic-search" className="sr-only">
-            Іздеу
-          </label>
-
-          <div className="flex-1 w-full">
-            <input
-              id="topic-search"
-              type="text"
-              placeholder="Информатика бойынша кез келген сұрақты жазыңыз..."
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              className="w-full rounded-xl px-4 py-4 text-indigo-900 placeholder-indigo-500 bg-white/90 border border-white/60 focus:outline-none focus:ring-4 focus:ring-indigo-200 transition"
-            />
-            <p className="mt-2 text-sm text-indigo-100/80">
-              AI жауаптарын қазақша аламыз — қажет болса, ағылшынша нұсқасын көруге болады.
-            </p>
+      {/* --- ВИКИПЕДИЯ ІЗДЕУ БЛОКЫ --- */}
+      <section className="max-w-5xl mx-auto mb-8 bg-white/5 p-6 rounded-2xl shadow-lg">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-semibold">Википедиядан іздеу</h2>
+          <div className="flex items-center gap-2">
+            <label className="text-sm">Тіл:</label>
+            <select
+              value={wikiLang}
+              onChange={(e) => setWikiLang(e.target.value as "kk" | "en")}
+              className="rounded-md bg-white/90 text-indigo-800 px-2 py-1 text-sm"
+            >
+              <option value="kk">Қазақша (kk)</option>
+              <option value="en">Ағылшынша (en)</option>
+            </select>
           </div>
+        </div>
 
+        <div className="flex gap-3">
+          <input
+            value={wikiQuery}
+            onChange={(e) => setWikiQuery(e.target.value)}
+            placeholder="Википедиядан іздеу — тақырып атауын енгізіңіз..."
+            className="flex-1 rounded-md px-4 py-3 text-indigo-900 bg-white/95 placeholder:text-indigo-500/60 shadow-inner"
+          />
           <button
-            type="submit"
-            disabled={loading}
-            className="mt-2 sm:mb-9 inline-flex items-center gap-2 px-5 py-3 bg-white text-indigo-700 font-semibold rounded-xl shadow hover:shadow-lg transition disabled:opacity-60"
+            onClick={() => performWikiSearch(wikiQuery, wikiLang)}
+            className="px-4 py-2 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white font-medium"
           >
-            {loading ? (
-              <>
-                <svg
-                  className="animate-spin h-5 w-5 text-indigo-700"
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                >
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
-                </svg>
-                Жауап күтіліп жатыр...
-              </>
-            ) : (
-              <>
-                <span className="text-lg">🔍</span>
-                <span>Сұрау</span>
-              </>
-            )}
+            Іздеу
           </button>
-        </form>
+        </div>
+
+        <div className="mt-4">
+          {wikiLoading && <div>Жүктелуде...</div>}
+          {wikiError && <div className="text-red-300">Қате: {wikiError}</div>}
+
+          {!wikiLoading && wikiResults.length === 0 && wikiQuery.trim() !== "" && !wikiError && (
+            <div className="text-indigo-100/80">Нәтиже табылмады.</div>
+          )}
+
+          <ul className="mt-3 space-y-3">
+            {wikiResults.map((r) => (
+              <li key={r.pageid} className="bg-white/90 text-indigo-900 p-3 rounded-lg shadow-sm">
+                <a href={`https://${wikiLang}.wikipedia.org/?curid=${r.pageid}`} target="_blank" rel="noreferrer" className="block">
+                  <h3 className="font-semibold">{r.title}</h3>
+                  <p className="text-sm mt-1" dangerouslySetInnerHTML={{ __html: r.snippet + (r.snippet.endsWith("...") ? "" : "...") }} />
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
       </section>
 
-      {/* Қате */}
-      {error && (
-        <section className="max-w-3xl mx-auto mb-6">
-          <div className="rounded-lg bg-red-50 text-red-900 p-4 shadow">
-            <strong className="block font-semibold mb-1">Қате</strong>
-            <div className="text-sm">{error}</div>
+      {/* AI search form (original) */}
+      <section className="max-w-5xl mx-auto mb-8 bg-white/5 p-6 rounded-2xl shadow-lg">
+        <form onSubmit={handleSearch} className="flex flex-col gap-4">
+          <label className="font-medium">AI арқылы сұрау жіберу</label>
+          <div className="flex gap-3">
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Сұрағыңызды жазыңыз... (мысалы: 'Екілік жүйе деген не?')"
+              className="flex-1 rounded-md px-4 py-3 text-indigo-900 bg-white/95 placeholder:text-indigo-500/60 shadow-inner"
+            />
+            <button type="submit" className="px-4 py-2 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white font-medium">
+              Жіберу
+            </button>
           </div>
-        </section>
-      )}
 
-      {/* Нәтиже */}
-      <section className="max-w-3xl mx-auto mb-12">
-        {result ? (
-          <article className="bg-white rounded-2xl shadow-lg p-6 text-indigo-900">
-            <div className="flex items-start justify-between">
-              <h3 className="font-bold text-xl md:text-2xl">Жауап</h3>
-              <span className="text-sm text-indigo-600/80">AI арқылы генерацияланған</span>
+          {loading && <div>AI жауап жүктелуде...</div>}
+          {error && <div className="text-red-300">{error}</div>}
+
+          {result && (
+            <div className="mt-2 bg-white/90 text-indigo-900 p-4 rounded-md shadow-sm">
+              {result.kz && (
+                <div>
+                  <h4 className="font-semibold">Қазақша жауап</h4>
+                  <p className="mt-1">{result.kz}</p>
+                </div>
+              )}
+
+              {result.en && (
+                <div className="mt-3">
+                  <h4 className="font-semibold">English (debug)</h4>
+                  <pre className="mt-1 whitespace-pre-wrap text-sm">{result.en}</pre>
+                </div>
+              )}
             </div>
-
-            <div className="mt-4 text-sm md:text-base leading-relaxed whitespace-pre-wrap">
-              {result.kz ?? "Қазақша жауап жоқ"}
-            </div>
-
-            {result.en && (
-              <details className="mt-6 text-sm">
-                <summary className="cursor-pointer font-medium">Ағылшынша нұсқа (кеңейту)</summary>
-                <pre className="mt-3 whitespace-pre-wrap text-xs bg-indigo-50 p-3 rounded">{result.en}</pre>
-              </details>
-            )}
-          </article>
-        ) : (
-          <div className="rounded-2xl bg-white/10 border border-white/10 p-6 text-center text-indigo-100">
-            <p className="text-lg font-medium">AI-дан жауап әлі алынбады</p>
-            <p className="mt-2 text-sm text-indigo-100/80">Сұрақ енгізіп, {"'Сұрау'"} батырмасын басыңыз</p>
-          </div>
-        )}
+          )}
+        </form>
       </section>
 
       <footer className="max-w-5xl mx-auto text-center text-indigo-100/70">
