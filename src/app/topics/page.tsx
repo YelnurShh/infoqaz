@@ -6,9 +6,18 @@ import { useState } from "react";
 type WikiResult = {
   title: string;
   extract?: string | null;
-  thumbnail?: { source: string } | string | null;
+  thumbnail?: { source?: string } | string | null;
   content_urls?: { desktop?: { page?: string } };
   error?: string | null;
+};
+
+/** API-дан келетін жауап форматын сипаттайтын интерфейс */
+type WikiApiResponse = {
+  title?: unknown;
+  extract?: unknown;
+  thumbnail?: unknown;
+  content_urls?: unknown;
+  type?: unknown;
 };
 
 const topics = [
@@ -25,6 +34,25 @@ const topics = [
   { id: "vector-creation", title: "Векторлық суреттерді құру" },
   { id: "page-layout", title: "Қисық бетімен жұмыс" },
 ];
+
+/** Type guard: API жауап объектісі WikiApiResponse тәрізді ме */
+function isWikiApiResponse(obj: unknown): obj is WikiApiResponse {
+  if (!obj || typeof obj !== "object") return false;
+  // ең аз талап — title өрісі бар және string болуы керек
+  const o = obj as Record<string, unknown>;
+  return typeof o.title === "string";
+}
+
+/** thumbnail өрісінен нақты URL алу (немесе null) */
+function getThumbnailUrl(thumbnail: unknown): string | null {
+  if (!thumbnail) return null;
+  if (typeof thumbnail === "string") return thumbnail;
+  if (typeof thumbnail === "object" && thumbnail !== null) {
+    const t = thumbnail as Record<string, unknown>;
+    if (typeof t.source === "string") return t.source;
+  }
+  return null;
+}
 
 export default function TopicsPage() {
   const [query, setQuery] = useState("");
@@ -50,7 +78,6 @@ export default function TopicsPage() {
         `https://kk.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(q)}`
       );
 
-      // HTTP қателерін тексеру
       if (!res.ok) {
         if (res.status === 404) {
           setError("Мақала табылмады (404). Басқа сөзбен іздеп көріңіз.");
@@ -60,44 +87,46 @@ export default function TopicsPage() {
         return;
       }
 
-      // JSON парсинг қауіпсіздігі
-      let data: any = null;
-      try {
-        data = await res.json();
-      } catch (err) {
-        setError("Сервер жауапты өңдей алмады (JSON парсинг қатесі).");
+      // json-ды unknown ретінде оқып, қауіпсіз тексереміз
+      const raw: unknown = await res.json();
+
+      if (!isWikiApiResponse(raw)) {
+        setError("Серверден күтілмеген жауап келді.");
         return;
       }
 
-      // Қарапайым тексеріс: title / extract бар ма
-      if (data?.title && (data?.extract || data?.type === "disambiguation")) {
-        // Wikipedia кейде "disambiguation" түрін қайтарады — сол кезде де көрсетуге болады
+      const api = raw as WikiApiResponse;
+
+      // Title бар-жоғын және extract не disambiguation типін тексеру
+      const isDisamb = typeof api.type === "string" && api.type === "disambiguation";
+      if (typeof api.title === "string" && (typeof api.extract === "string" || isDisamb)) {
+        const thumb = getThumbnailUrl(api.thumbnail);
         setResult({
-          title: data.title,
-          extract: data.extract ?? null,
-          thumbnail: data.thumbnail ?? null,
-          content_urls: data.content_urls ?? null,
+          title: api.title as string,
+          extract: (typeof api.extract === "string" ? api.extract : null),
+          thumbnail: thumb ? thumb : null,
+          content_urls: (typeof api.content_urls === "object" && api.content_urls !== null)
+            ? (api.content_urls as { desktop?: { page?: string } })
+            : undefined,
         });
       } else {
         setError("Мәлімет табылмады.");
       }
-    } catch (err: any) {
-      setError(err?.message ?? "Белгісіз қате");
+    } catch (err: unknown) {
+      // err-ті string-ке қауіпсіз түрлендіру
+      const message =
+        err && typeof err === "object" && "message" in err && typeof (err as any).message === "string"
+          ? (err as any).message
+          : String(err);
+      setError(message || "Белгісіз қате");
     } finally {
       setLoading(false);
     }
   };
 
-  // thumbnail-дан URL-ды алу (түрі әртүрлі болуы мүмкін)
-  const thumbnailUrl = (t: WikiResult["thumbnail"]) => {
-    if (!t) return null;
-    if (typeof t === "string") return t;
-    return (t as any).source ?? null;
-  };
-
   return (
     <main className="min-h-screen bg-gradient-to-br from-indigo-600 to-blue-500 text-white px-4 py-12 md:px-12 lg:px-24">
-      {/* ----------- ЖОҒАРҒЫ БӨЛІК (Тақырыптар) ----------- */}
+      {/* HEADER */}
       <header className="max-w-5xl mx-auto mb-8 text-center">
         <h1 className="text-3xl md:text-5xl font-extrabold mb-2">
           Информатика тақырыптары
@@ -107,7 +136,7 @@ export default function TopicsPage() {
         </p>
       </header>
 
-      {/* Topics grid */}
+      {/* TOPICS GRID */}
       <section className="max-w-5xl mx-auto mb-16">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {topics.map((topic) => (
@@ -132,10 +161,9 @@ export default function TopicsPage() {
         </div>
       </section>
 
-      {/* ----------- ВИКИПЕДИЯ ІЗДЕУ БЛОГЫ ----------- */}
+      {/* WIKI SEARCH */}
       <h2 className="text-center text-2xl font-bold mb-4">🟦 Википедиядан іздеу</h2>
 
-      {/* Search input */}
       <form
         onSubmit={handleSearch}
         className="max-w-3xl mx-auto mb-6 flex flex-col sm:flex-row gap-3"
@@ -157,29 +185,24 @@ export default function TopicsPage() {
         </button>
       </form>
 
-      {/* Қате хабар */}
       {error && (
         <div className="max-w-3xl mx-auto text-center bg-red-200/20 border border-red-400 text-white p-3 rounded mb-4">
           {error}
         </div>
       )}
 
-      {/* Ойлану индикаторы */}
       {loading && (
         <div className="max-w-3xl mx-auto flex justify-center items-center py-10">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-white"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-white" />
         </div>
       )}
 
-      {/* Нәтиже карточкасы */}
       {!loading && result && (
         <div className="max-w-3xl mx-auto bg-white text-black p-4 md:p-6 rounded-lg shadow">
-          {thumbnailUrl(result.thumbnail) && (
+          {getThumbnailUrl(result.thumbnail) && (
             <div className="w-full h-48 md:h-64 mb-4 overflow-hidden rounded">
-              {/* Next/Image қолдану үшін next.config.js-ке домен қосу керек.
-                  Қарапайым әрі сенімді — <img> қолдандым. */}
               <img
-                src={thumbnailUrl(result.thumbnail) as string}
+                src={getThumbnailUrl(result.thumbnail) as string}
                 alt={result.title}
                 className="w-full h-full object-cover rounded"
               />
