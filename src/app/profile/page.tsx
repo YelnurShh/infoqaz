@@ -42,8 +42,16 @@ export default function ProfilePage() {
     router.push("/");
   };
 
+  // 🔹 ТҮЗЕТІЛГЕН ЖҮКТЕЛУ ЭКРАНЫ: Фон сақталады, әдемі спиннер қосылды
   if (loading) {
-    return <p className="text-center mt-10">Жүктеліп жатыр...</p>;
+    return (
+      <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-700 via-blue-500 to-blue-400 text-white">
+        <div className="flex flex-col items-center space-y-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-white"></div>
+          <p className="text-xl font-medium italic">Жүктеліп жатыр...</p>
+        </div>
+      </main>
+    );
   }
 
   // 🔹 Ұпайға байланысты марапаттар

@@ -45,7 +45,7 @@ export default function Header() {
           <p className="text-sm font-medium opacity-90 leading-tight">
             Информатика пәнінің мұғалімі:
             <br />
-            <span className="font-semibold">Шахарова Гүлпайна Өтегенқызы</span>
+            <span className="font-semibold">Сыздыкбаева Нургул Алжаппаровна</span>
           </p>
         </div>
 
@@ -82,7 +82,7 @@ export default function Header() {
         <p className="text-xs font-medium opacity-90 leading-tight mb-2">
           Информатика пәнінің мұғалімі:
           <br />
-          <span className="font-semibold">Шахарова Гүлпайна Өтегенқызы</span>
+          <span className="font-semibold">Сыздыкбаева Нургул Алжаппаровна</span>
         </p>
 
         {/* Мобиль мәзір батырмасы */}
